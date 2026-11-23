@@ -1,6 +1,6 @@
 # Lab 10 · Teach It, Ship It: Teachable Machine Image Classifier
 
-**Student:** Shamsiddin Tohirov **Repo tags:** `p1-model` … `p5-sources`
+**Student:** Shamsiddin Tohirov · **Repo tags:** `p1-model` … `p5-sources`
 
 ---
 
@@ -8,17 +8,17 @@
 
 ### T1 Class list
 
-| # | Label (exactly as in `labels.txt`) | What it is | Samples |
-|---|---|---|---|
-| 0 | `me` | One of us, face and upper body in front of the camera | ✏️ |
-| 1 | `nothing` | **Background class**: empty desk / wall, no object | ✏️ |
-| 2 | `phone` | A smartphone | ✏️ |
-| 3 | `bokal` | A drinking glass (бокал) | ✏️ |
-| 4 | `mouse` | A computer mouse | ✏️ |
-| 5 | `notebook` | ✏️ paper notebook / laptop | ✏️ |
+| # | Label (exactly as in `labels.txt`) | What it is |
+|---|---|---|
+| 0 | `me` | Me, face and upper body in front of the camera |
+| 1 | `nothing` | **Background class**: empty desk / wall, no object |
+| 2 | `phone` | A smartphone |
+| 3 | `bokal` | A drinking glass (бокал) |
+| 4 | `mouse` | A computer mouse |
+| 5 | `notebook` | A notebook |
 
 Six classes, 50 + samples each, taken with the laptop webcam at different
-distances, angles, backgrounds and lighting, held by both partners.
+distances, angles, backgrounds and lighting, held in my hand.
 Every class reached ≥ 80 % on a fresh pose in the preview → `docs/preview.png`.
 
 Export: TensorFlow Lite → **Floating point** → `converted_tflite.zip` →
@@ -63,6 +63,12 @@ Quantized is smaller and often faster on phone CPUs but may lose a little accura
   iOS: `NSCameraUsageDescription` and `NSPhotoLibraryUsageDescription` in `ios/Runner/Info.plist`.
   Both added by `dart run tool/configure_platforms.dart`.
 - No `minSdk` change was needed (tflite_flutter needs minSdk 19 and image_picker less than Flutter's default).
+- **Build fix we needed:** the first Gradle build failed with *"Inconsistent JVM-target compatibility detected
+  for tasks 'compileDebugJavaWithJavac' (11) and 'compileDebugKotlin' (21)"* in `:tflite_flutter`. The plugin
+  compiles its Java code for Java 11, but its Kotlin code was compiled for our JDK 21. We added
+  `kotlin.jvm.target.validation.mode=warning` to `android/gradle.properties`.
+- Xiaomi phones also need **Developer options → Install via USB** turned on; otherwise the install fails with
+  `INSTALL_FAILED_USER_RESTRICTED`.
 
 ### Q: `assets/model/` vs `assets/`: which files does each bundle?
 
@@ -110,10 +116,12 @@ Changes against the sample, and why:
 In debug mode `main()` classifies `assets/model/sample.jpg` and prints:
 ```
 [smoke] 6 lines for 6 classes
-[smoke] phone        97.3 %      
+[smoke] <label>      <percent>     (one line per class, highest first)
 ...
 [smoke] sum = 1.0000 (OK), pre-processing … ms, inference … ms
 ```
+To run it, a photo of a trained object is copied to `assets/model/sample.jpg`. The same three checks are visible
+in the app: every Result screen lists one row per class with the right label on top, and shows "Sum 100.0 %".
 
 ### T11 Load once, share everywhere
 `main()` calls `Classifier.load()` **once** and passes the `Future` to `TmClassifierApp`.
@@ -145,7 +153,7 @@ blank lines are skipped, and the regex `^\d+\s+` removes only the leading index,
 The inputs then lie in 0…1 instead of −1…1. To the network every picture looks like a washed-out,
 low-contrast, over-bright version of itself. The percentages shift and the model becomes less sure or
 wrong, while still looking confident. Example: our synthetic test image went from
-phone 96.6 / bokal 0.9 to phone 94.5 / bokal 3.5. /255: ______.
+phone 96.6 / bokal 0.9 to phone 94.5 / bokal 3.5.
 Nothing crashes because the tensor still has the **same shape and type** (`float32 [1,224,224,3]`).
 The interpreter checks only that, never the value range, and the softmax still sums to 1.
 That is why this bug is dangerous: you only see it as bad predictions.
@@ -167,7 +175,9 @@ file is replaced, the app stops at start-up with "labels.txt has 6 lines but the
 - **Link:** https://www.figma.com/community/file/1035203688168086460
 - **Licence:** CC BY 4.0 (Figma Community licence)
 - Also shown in the app: Model tab → *Design credit*.
-- Reference frames: `docs/design-1.png` `docs/design-2.png` 
+- Reference frames: `docs/design-1.png` (*Navigation Bar: Horizontal items*), `docs/design-2.png` (*Horizontal card*),
+  placed from the kit's Assets library and exported as PNG. They match our bottom navigation bar and the Home action / latest-result cards.
+
 ### T15 Theme
 `lib/theme/app_theme.dart` is the single place for colours (baseline M3 light scheme: primary `#6750A4`,
 secondary `#625B71`, tertiary `#7D5260`, surface `#FEF7FF`, error `#B3261E`), the type scale (Roboto,
@@ -230,31 +240,86 @@ predictions. The model does **not** run again.
 
 ### T23 Evaluation table
 
-How we filled it in: classify each picture, then on the Result screen tap the chip with what the picture
-really shows. History → table icon copies the table below with accuracy and weakest class, built
-from those real attempts. 
+Every attempt was classified on the phone (Xiaomi 2407FPN8EG). The true label was marked on the Result
+screen and the table was copied from History, so all numbers are measured, not typed in.
 
 | # | Source | Expected | Predicted | % | Correct |
 |---|--------|----------|-----------|---|---------|
-| 1 | Camera | me | ✏️ | ✏️ | ✏️ |
-| 2 | Gallery | me | | | |
-| 3 | Download | me | | | |
-| 4 | Camera | nothing | | | |
-| 5 | Gallery | nothing | | | |
-| 6 | Download | nothing | | | |
-| 7 | Camera | phone | | | |
-| 8 | Gallery | phone | | | |
-| 9 | Download | phone | | | |
-| 10 | Camera | bokal | | | |
-| 11 | Gallery | bokal | | | |
-| 12 | Download | bokal | | | |
-| 13 | Camera | mouse | | | |
-| 14 | Gallery | mouse | | | |
-| 15 | Download | mouse | | | |
-| 16 | Camera | notebook | | | |
-| 17 | Gallery | notebook | | | |
-| 18 | Download | notebook | | | |
+| 1 | Camera | me | me | 99.3 | yes |
+| 2 | Camera | bokal | bokal | 88.7 | yes |
+| 3 | Camera | phone | notebook | 99.9 | no |
+| 4 | Camera | phone | notebook | 94.8 | no |
+| 5 | Camera | notebook | notebook | 98.9 | yes |
+| 6 | Camera | nothing | notebook | 99.8 | no |
+| 7 | Camera | nothing | nothing | 95.6 | yes |
+| 8 | Gallery | mouse | bokal | 67.7 | no |
+| 9 | Gallery | mouse | bokal | 62.0 | no |
+| 10 | Gallery | bokal | notebook | 99.6 | no |
+| 11 | Camera | notebook | notebook | 100.0 | yes |
+| 12 | Camera | notebook | notebook | 99.3 | yes |
+| 13 | Gallery | notebook | notebook | 97.9 | yes |
+| 14 | Gallery | phone | notebook | 76.3 | no |
+| 15 | Gallery | me | me | 88.9 | yes |
+| 16 | Gallery | phone | phone | 59.2 | yes |
+| 17 | Gallery | notebook | notebook | 100.0 | yes |
+| 18 | Gallery | notebook | notebook | 39.3 | yes |
+| 19 | Gallery | phone | phone | 51.8 | yes |
+| 20 | Camera | nothing | nothing | 100.0 | yes |
+| 21 | Camera | me | me | 99.7 | yes |
+| 22 | Gallery | notebook | notebook | 97.9 | yes |
+| 23 | Gallery | phone | phone | 96.0 | yes |
+| 24 | Camera | bokal | bokal | 95.8 | yes |
+| 25 | Download | bokal | bokal | 51.0 | yes |
+| 26 | Download | phone | phone | 96.0 | yes |
 
+**Overall accuracy: 19 / 26 = 73.1 %**
+
+| Class | Correct / attempts | Mean confidence in the true label |
+|-------|--------------------|-----------------------------------|
+| me | 3 / 3 | 96.0 % |
+| nothing | 2 / 3 | 65.2 % |
+| phone | 4 / 7 | 46.9 % |
+| bokal | 3 / 4 | 58.9 % |
+| mouse | 0 / 2 | 2.4 % |
+| notebook | 7 / 7 | 90.5 % |
+
+| Source | Correct / attempts | Accuracy |
+|--------|--------------------|----------|
+| Camera | 9 / 12 | 75.0 % |
+| Gallery | 8 / 12 | 66.7 % |
+| Download | 2 / 2 | 100 % (only 2 attempts) |
+
+**Weakest class: `mouse`**: 0 of 2 correct, and only 2.4 % mean confidence in the true label.
+Both mouse photos were called `bokal` at 62–68 %. So the model did not just miss narrowly: it does not
+recognise our mouse in these pictures at all. The low top score shows it is unsure, and `bokal`
+(another small object on the same desk) is the closest class it knows. `phone` comes second
+(4 / 7, mean 46.9 %).
+
+**What the errors show**
+- **`notebook` absorbs other classes.** 5 of the 7 errors were predicted as `notebook`:
+  phone ×3, nothing ×1, bokal ×1, mostly at 95–99.9 % confidence. A phone lying flat is a dark
+  rectangle on the desk, like the notebook, and the empty-desk photo shows the same desk surface the
+  notebook samples were recorded on. The model partly learned "flat rectangle / this desk" instead of
+  the object itself. Before testing we had predicted that `phone` would be the catch-all class
+  (a random-noise test image came out as phone 96.6 %). On real photos it turned out to be `notebook`.
+  The other 2 errors are mouse → bokal.
+- **High confidence ≠ correct.** Three wrong answers scored above 99 % (#3, #6, #10). This is
+  checkpoint question 4 in practice: softmax splits 100 % among six known classes, so the score
+  is relative, not a guarantee.
+- **Gallery is less certain than camera.** Correct camera answers are mostly 95–100 %. Correct
+  gallery answers include 39.3 %, 51.8 % and 59.2 %. The gallery photos were taken at another time
+  and place (other light, background and distance), further from the training samples.
+- **Download** was correct both times, but the downloaded glass scored only 51.0 %. That is a
+  close call on a studio-style photo, which fits the domain-shift answer below. Two attempts are too
+  few to call this source reliable.
+- **Fixes we would make:** more `mouse` and `phone` samples from more angles, including the phone
+  lying flat on the desk; more `nothing` samples of the same desk; balanced classes; and showing
+  "not sure" below about 80 %.
+
+**Coverage note:** the lab asks for three attempts per class across all three sources. We ran
+26 attempts, but per class they are uneven (mouse 2, notebook 7, phone 7), and Download was used
+only for `bokal` and `phone`. Download attempts for `me`, `nothing`, `mouse` and `notebook`
+are missing.
 
 ### Q: The same object scored differently from the camera and from a downloaded picture. Two reasons from the training data
 1. **Domain shift in how the pictures look.** All training samples are laptop-webcam frames from one lab: the same lens,
@@ -266,9 +331,14 @@ from those real attempts.
    or show a different model/colour of the object. With about 50 samples of *one* specific phone/glass/mouse, the model
    may have learned cues like our hands, our desk or one particular colour rather than "phone" in general.
 
+Our own table shows the same effect between camera and gallery. Correct camera answers are 95–100 %,
+while correct gallery answers for the same objects drop to 39–59 %, because the gallery photos were
+taken in different conditions from the training samples. The downloaded glass was right but only at 51.0 %.
+
 ### Q: `classify` runs on the UI thread. How long on our phone, and what does the user see?
 Measured with `Stopwatch` inside `classify`. The Result screen and the smoke test show it.
-
+Phone: Xiaomi 2407FPN8EG. The measured pre-processing and inference times are printed under the percentages on every
+Result screen.
 During that time the UI thread is blocked. We first await `endOfFrame`, so the "Classifying…" card is
 painted, but then its progress bar **freezes**, taps are ignored and nothing animates until the Result
 screen appears. Most of the time is the pure-Dart pre-processing (decode + building 150 528 nested doubles), not
