@@ -1,0 +1,6 @@
+0 me
+1 nothing
+2 phone
+3 bokal
+4 mouse
+5 notebook
